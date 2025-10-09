@@ -15,10 +15,12 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
-from django.urls import include
+from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('biometria.urls')),
+    # UI routes at root (dashboard, register_fingerprint, login)
+    path('', include('biometria.urls')),
+    # API routes under /api/
+    path('api/', include('biometria.urls_api')),
 ]

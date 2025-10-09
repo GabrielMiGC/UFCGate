@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Usuario, Digital, HistoricoAcesso
 from .serializers import UsuarioSerializer
+from django.shortcuts import render
 
 
 # ===============================
@@ -125,3 +126,17 @@ def list_users(request):
     usuarios = Usuario.objects.all().order_by('id')
     serializer = UsuarioSerializer(usuarios, many=True)
     return Response(serializer.data)
+
+
+def dashboard(request):
+    # request.user is available thanks to AuthenticationMiddleware in settings
+    return render(request, 'dashboard.html')
+
+
+def register_fingerprint_page(request):
+    return render(request, 'register_fingerprint.html')
+
+
+def login_view(request):
+    # If you later wire a form handler, change method handling here
+    return render(request, 'login.html')
