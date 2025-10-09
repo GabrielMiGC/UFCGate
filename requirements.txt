@@ -1,0 +1,7 @@
+Django>=4.2
+djangorestframework
+psycopg2-binary
+python-dotenv
+dj-database-url
+pyserial        # quando você for integrar leitura serial no servidor
+cryptography    # se precisar de encriptação
