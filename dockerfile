@@ -5,6 +5,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,5 +20,10 @@ COPY . /app
 
 # Expõe a porta
 EXPOSE 8000
+
+# Entrypoint para aplicar schema antes de iniciar
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 
 # default command is set by docker-compose (migrate + runserver)

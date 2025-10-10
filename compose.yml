@@ -36,5 +36,29 @@ services:
              python manage.py runserver 0.0.0.0:8000"
     restart: unless-stopped
 
+  bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.bridge
+    container_name: biometria_bridge
+    # On Linux, pass the serial device into the container (uncomment and set correct device)
+    # devices:
+    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
+    #   - "/dev/ttyACM0:/dev/ttyACM0"
+    environment:
+      # Use service name 'web' from compose for Django URLs
+      - VERIFY_URL=http://web:8000/api/verify/
+      - REGISTER_URL=http://web:8000/api/register/
+      # SERIAL_PORT options:
+      #  - auto (default): try to auto-detect a serial port
+      #  - explicit path: e.g. /dev/ttyUSB0, /dev/ttyACM0, COM5
+      #  - rfc2217://host:port if using a serial-over-TCP gateway
+      - SERIAL_PORT=auto
+      - SERIAL_BAUD=115200
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   postgres_data:
