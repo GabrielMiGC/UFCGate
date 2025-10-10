@@ -7,4 +7,6 @@ urlpatterns = [
     path('verify/', views.verify_template, name='verify_template'),
     path('remove/', views.remove_user, name='remove_user'),
     path('users/', views.list_users, name='list_users'),
+    path('capture/submit/', views.capture_submit, name='capture_submit'),
+    path('capture/latest/', views.capture_latest, name='capture_latest'),
 ]

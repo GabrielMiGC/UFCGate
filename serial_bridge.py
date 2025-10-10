@@ -3,14 +3,27 @@ import requests
 import serial
 from serial.tools import list_ports
 
+def _env_str(name, default=""):
+    val = os.getenv(name, default)
+    if isinstance(val, str):
+        # strip surrounding quotes if present (e.g., 'COM5')
+        val = val.strip().strip("'\"")
+    return val
+
 # Environment-driven configuration with sensible defaults
-SERIAL_PORT = os.getenv('SERIAL_PORT', 'auto')  # 'auto', 'COM5', '/dev/ttyUSB0', or rfc2217://host:port
-SERIAL_BAUD = int(os.getenv('SERIAL_BAUD', '115200'))
+SERIAL_PORT = _env_str('SERIAL_PORT', 'auto')  # 'auto', 'COM5', '/dev/ttyUSB0', or rfc2217://host:port
+# Support both SERIAL_BAUD and SERIAL_BAUDRATE env names
+_baud = _env_str('SERIAL_BAUD') or _env_str('SERIAL_BAUDRATE') or '115200'
+try:
+    SERIAL_BAUD = int(_baud)
+except Exception:
+    SERIAL_BAUD = 115200
 VERIFY_URL = os.getenv('VERIFY_URL', 'http://127.0.0.1:8000/api/verify/')
 REGISTER_URL = os.getenv('REGISTER_URL', 'http://127.0.0.1:8000/api/register/')
 READ_TIMEOUT = float(os.getenv('READ_TIMEOUT', '1'))  # seconds
 HTTP_TIMEOUT = float(os.getenv('HTTP_TIMEOUT', '5'))  # seconds
 RECONNECT_DELAY = float(os.getenv('RECONNECT_DELAY', '2'))  # seconds
+CAPTURE_URL = os.getenv('CAPTURE_URL', 'http://127.0.0.1:8000/api/capture/submit/')
 
 
 def detect_port():
@@ -64,6 +77,11 @@ def handle_message(msg, ser):
     # Verify flow: expects {"template_b64": "..."}
     if 'template_b64' in msg:
         try:
+            # Mirror to capture endpoint for UI autofill
+            try:
+                requests.post(CAPTURE_URL, json={'template_b64': msg['template_b64']}, timeout=HTTP_TIMEOUT)
+            except Exception:
+                pass
             resp = requests.post(VERIFY_URL, json={'template_b64': msg['template_b64']}, timeout=HTTP_TIMEOUT)
             data = resp.json() if resp.content else {}
             if resp.ok and data.get('match'):

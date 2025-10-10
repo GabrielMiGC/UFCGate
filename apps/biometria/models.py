@@ -17,6 +17,19 @@ class TipoAcesso(models.TextChoices):
     SAIDA = "saida", "Saída"
 
 
+class Dedo(models.TextChoices):
+    INDICADOR_DIR = "indicador_dir", "Indicador DIR."
+    POLEGAR_DIR = "polegar_dir", "Polegar DIR."
+    MEDIO_DIR = "medio_dir", "Médio DIR."
+    ANELAR_DIR = "anelar_dir", "Anelar DIR."
+    MINIMO_DIR = "minimo_dir", "Mínimo DIR."
+    INDICADOR_ESQ = "indicador_esq", "Indicador ESQ."
+    POLEGAR_ESQ = "polegar_esq", "Polegar ESQ."
+    MEDIO_ESQ = "medio_esq", "Médio ESQ."
+    ANELAR_ESQ = "anelar_esq", "Anelar ESQ."
+    MINIMO_ESQ = "minimo_esq", "Mínimo ESQ."
+
+
 # ============================
 #  MODELOS PRINCIPAIS
 # ============================
@@ -64,7 +77,12 @@ class Digital(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="digitais")
     template_b64 = models.TextField()  # Base64 do template biométrico
     hash_sha256 = models.CharField(max_length=64, editable=False)
-    dedo = models.PositiveSmallIntegerField(blank=True, null=True)
+    dedo = models.CharField(
+        max_length=20,
+        choices=Dedo.choices,
+        blank=True,
+        null=True,
+    )
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(default=timezone.now)
 
@@ -98,3 +116,14 @@ class HistoricoAcesso(models.Model):
         u = self.usuario.nome if self.usuario else "Usuário desconhecido"
         s = self.sala.nome if self.sala else "Sala indefinida"
         return f"{u} - {s} ({self.tipo_acesso}) em {self.data_hora:%d/%m %H:%M}"
+
+
+# ============================
+#  CAPTURAS RECENTES (auxiliar)
+# ============================
+class CapturedTemplate(models.Model):
+    template_b64 = models.TextField()
+    criado_em = models.DateTimeField(default=timezone.now, db_index=True)
+
+    def __str__(self):
+        return f"Captura {self.id} em {self.criado_em:%d/%m %H:%M:%S}"

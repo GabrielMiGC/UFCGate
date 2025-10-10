@@ -11,6 +11,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_acesso_enum') THEN
     CREATE TYPE sistema_biometrico.tipo_acesso_enum AS ENUM ('entrada', 'saida');
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_dedo_enum') THEN
+    CREATE TYPE sistema_biometrico.tipo_dedo_enum AS ENUM (
+      'indicador_dir', 'polegar_dir', 'medio_dir', 'anelar_dir', 'minimo_dir',
+      'indicador_esq', 'polegar_esq', 'medio_esq', 'anelar_esq', 'minimo_esq'
+    );
+  END IF;
 END$$;
 
 -- Tabela de usuários
@@ -52,7 +58,7 @@ CREATE TABLE IF NOT EXISTS sistema_biometrico.digitais (
         ON DELETE CASCADE ON UPDATE CASCADE,
     template_b64 TEXT NOT NULL,
     hash_sha256 CHAR(64) NOT NULL,              -- calculado pelo backend em SHA256(template_b64)
-    dedo SMALLINT,
+  dedo sistema_biometrico.tipo_dedo_enum,
     ativo BOOLEAN NOT NULL DEFAULT true,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (usuario_id, hash_sha256)
