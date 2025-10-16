@@ -9,4 +9,6 @@ urlpatterns = [
     path('users/', views.list_users, name='list_users'),
     path('capture/submit/', views.capture_submit, name='capture_submit'),
     path('capture/latest/', views.capture_latest, name='capture_latest'),
+    path('consult/fingerprint/', views.consult_fingerprint, name='consult_fingerprint'),
+    path('confirm/access/', views.confirm_access, name='confirm_access'),
 ]

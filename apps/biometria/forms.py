@@ -32,8 +32,12 @@ class DigitalForm(forms.ModelForm):
 
 
 class UsuarioCadastroForm(forms.ModelForm):
+    # Observação: definimos um queryset vazio inicialmente para evitar avaliação
+    # estática no momento do import do módulo. Ele será preenchido dinamicamente
+    # no __init__. Isso garante que salas criadas após o start do servidor
+    # (ex: 'NEMO') apareçam imediatamente no formulário sem precisar reiniciar.
     salas = forms.ModelMultipleChoiceField(
-        queryset=Sala.objects.all(),
+        queryset=Sala.objects.none(),
         widget=forms.SelectMultiple(attrs={"size": 6}),
         required=False,
         help_text="Selecione as salas autorizadas"
@@ -46,6 +50,11 @@ class UsuarioCadastroForm(forms.ModelForm):
             'codigo',
             'tipo_usuario',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Queryset dinâmico e ordenado alfabeticamente
+        self.fields['salas'].queryset = Sala.objects.all().order_by('nome')
 
 
 class DigitalInlineForm(forms.Form):

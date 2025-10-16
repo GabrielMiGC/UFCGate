@@ -228,3 +228,83 @@ def capture_latest(request):
     if not obj:
         return Response({'template_b64': None})
     return Response({'template_b64': obj.template_b64, 'criado_em': obj.criado_em})
+
+
+# ===============================
+# Consulta operador (não grava histórico) + confirmação
+# ===============================
+@api_view(['POST'])
+def consult_fingerprint(request):
+    """Consulta uma digital capturada (template base64) e retorna o usuário e salas vinculadas.
+
+    Entrada JSON: { "template_b64": "..." }
+    Saída se match:
+    {
+        "match": true,
+        "usuario": {"id": 1, "nome": "...", "codigo": "...", "tipo_usuario": "aluno"},
+        "salas": [ {"id": 3, "nome": "LAB"}, ... ]
+    }
+    Caso não encontre: { "match": false }
+    """
+    template_b64 = request.data.get('template_b64')
+    if not template_b64:
+        return Response({'error': 'template_b64 requerido'}, status=status.HTTP_400_BAD_REQUEST)
+    h = hashlib.sha256(template_b64.encode('utf-8')).hexdigest()
+    digital = Digital.objects.filter(hash_sha256=h, ativo=True).select_related('usuario').first()
+    if not digital:
+        return Response({'match': False}, status=status.HTTP_404_NOT_FOUND)
+    usuario = digital.usuario
+    salas_rel = UsuarioSala.objects.filter(usuario=usuario).select_related('sala')
+    salas = [
+        {'id': rel.sala.id, 'nome': rel.sala.nome}
+        for rel in salas_rel
+    ]
+    return Response({
+        'match': True,
+        'usuario': {
+            'id': usuario.id,
+            'nome': usuario.nome,
+            'codigo': usuario.codigo,
+            'tipo_usuario': usuario.tipo_usuario,
+        },
+        'salas': salas
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def confirm_access(request):
+    """Confirma o acesso de um usuário a uma sala, gravando no histórico.
+
+    Entrada JSON: { "usuario_id": 1, "sala_id": 5 }
+    Usa o contexto de acesso armazenado em sessão (entrada/saida) ou fallback para ENTRADA.
+    Retorna histórico criado.
+    """
+    usuario_id = request.data.get('usuario_id')
+    sala_id = request.data.get('sala_id')
+    if not usuario_id or not sala_id:
+        return Response({'error': 'usuario_id e sala_id requeridos'}, status=status.HTTP_400_BAD_REQUEST)
+    usuario = Usuario.objects.filter(id=usuario_id).first()
+    sala = Sala.objects.filter(id=sala_id).first()
+    if not usuario or not sala:
+        return Response({'error': 'Usuário ou sala inválidos'}, status=status.HTTP_404_NOT_FOUND)
+    if not UsuarioSala.objects.filter(usuario=usuario, sala=sala).exists():
+        return Response({'error': 'Usuário não possui acesso a esta sala'}, status=status.HTTP_403_FORBIDDEN)
+    tipo = request.session.get('tipo_acesso')
+    if tipo not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
+        tipo = TipoAcesso.ENTRADA
+    hist = HistoricoAcesso.objects.create(
+        usuario=usuario,
+        sala=sala,
+        tipo_acesso=tipo,
+        motivo='Acesso confirmado via painel'
+    )
+    return Response({
+        'ok': True,
+        'historico': {
+            'id': hist.id,
+            'usuario_nome': usuario.nome,
+            'sala_nome': sala.nome,
+            'tipo_acesso': hist.tipo_acesso,
+            'data_hora': hist.data_hora,
+        }
+    }, status=status.HTTP_201_CREATED)

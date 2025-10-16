@@ -11,19 +11,28 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+try:
+    import dj_database_url  # type: ignore
+except Exception:  # pragma: no cover
+    dj_database_url = None  # fallback se pacote não estiver instalado
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env if present
+load_dotenv(BASE_DIR.parent / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-lr$5jxcvs+jbj0hpd#c!w+#f_)=dy_)@z*pq70++v(3-y9+b&^'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-lr$5jxcvs+jbj0hpd#c!w+#f_)=dy_)@z*pq70++v(3-y9+b&^')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = bool(int(os.getenv('DJANGO_DEBUG', '1')))
 
 ALLOWED_HOSTS = []
 
@@ -37,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'biometria',
 ]
 
@@ -71,14 +81,53 @@ WSGI_APPLICATION = 'biometria_server.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+DATABASE_URL = os.getenv('DATABASE_URL')
+# Valores Postgres explícitos
+PG_NAME = os.getenv('POSTGRES_DB')
+PG_USER = os.getenv('POSTGRES_USER')
+PG_PASSWORD = os.getenv('POSTGRES_PASSWORD')
+PG_HOST = os.getenv('DB_HOST')  # só usamos se explicitamente definido
+PG_PORT = os.getenv('DB_PORT', '5432')
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Preferência:
+# 1) Se DB_HOST estiver definido e POSTGRES_* presentes -> usar configuração manual (útil fora do Docker)
+# 2) Senão, se DATABASE_URL estiver definido -> usar dj_database_url (útil no Docker, host 'db')
+# 3) Senão, fallback para SQLite
+if PG_HOST and PG_NAME and PG_USER and PG_PASSWORD:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': PG_NAME,
+            'USER': PG_USER,
+            'PASSWORD': PG_PASSWORD,
+            'HOST': PG_HOST,
+            'PORT': PG_PORT,
+        }
     }
-}
+elif DATABASE_URL and dj_database_url:
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False),
+    }
+else:
+    # Fallback para SQLite em desenvolvimento sem .env configurado
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
+# Se estivermos fora de Docker, e o host resultante for 'db', redireciona para localhost
+IN_DOCKER = os.path.exists('/.dockerenv') or os.getenv('RUNNING_IN_DOCKER') == '1'
+if not IN_DOCKER:
+    try:
+        host = DATABASES['default'].get('HOST')
+        if host in ('db', 'postgres', 'postgresql'):
+            DATABASES['default']['HOST'] = os.getenv('DB_HOST', '127.0.0.1')
+            # porta padrão já é 5432; respeita DB_PORT se fornecido
+            DATABASES['default']['PORT'] = os.getenv('DB_PORT', DATABASES['default'].get('PORT', '5432'))
+    except Exception:
+        pass
 
 
 # Password validation
