@@ -1,0 +1,4 @@
+requests
+pyserial
+python-dotenv
+flask

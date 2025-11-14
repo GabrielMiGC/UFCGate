@@ -1,5 +1,6 @@
 services:
   db:
+    profiles: [web]
     image: postgres:15-alpine
     container_name: biometria_db
     env_file: .env
@@ -19,9 +20,10 @@ services:
     restart: unless-stopped
 
   web:
+    profiles: [web]
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     container_name: biometria_web
     env_file: .env
     depends_on:
@@ -30,35 +32,13 @@ services:
     volumes:
       - ./:/app
     ports:
-      - "8000:8000"
+      - "8080:8000"
     command: >
-      sh -c "python manage.py migrate --noinput &&
+      sh -c "python manage.py migrate --fake-initial biometria &&
+             python manage.py migrate --noinput &&
              python manage.py runserver 0.0.0.0:8000"
     restart: unless-stopped
-
-  bridge:
-    build:
-      context: .
-      dockerfile: Dockerfile.bridge
-    container_name: biometria_bridge
-    # On Linux, pass the serial device into the container (uncomment and set correct device)
-    # devices:
-    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
-    #   - "/dev/ttyACM0:/dev/ttyACM0"
-    environment:
-      # Use service name 'web' from compose for Django URLs
-      - VERIFY_URL=http://web:8000/api/verify/
-      - REGISTER_URL=http://web:8000/api/register/
-      # SERIAL_PORT options:
-      #  - auto (default): try to auto-detect a serial port
-      #  - explicit path: e.g. /dev/ttyUSB0, /dev/ttyACM0, COM5
-      #  - rfc2217://host:port if using a serial-over-TCP gateway
-      - SERIAL_PORT=auto
-      - SERIAL_BAUD=115200
-    depends_on:
-      web:
-        condition: service_started
-    restart: unless-stopped
-
 volumes:
   postgres_data:
+    name: ufcgate_biometria_postgres_data
+    external: true

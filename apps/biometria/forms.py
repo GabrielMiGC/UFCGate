@@ -22,14 +22,6 @@ class SalaForm(forms.ModelForm):
         ]
 
 
-class DigitalForm(forms.ModelForm):
-    class Meta:
-        model = Digital
-        fields = [
-            'dedo',
-            'template_b64',
-        ]
-
 
 class UsuarioCadastroForm(forms.ModelForm):
     # Observação: definimos um queryset vazio inicialmente para evitar avaliação

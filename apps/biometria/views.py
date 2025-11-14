@@ -1,208 +1,157 @@
-import hashlib
+import requests
+import os
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Usuario, Digital, HistoricoAcesso
-from .serializers import UsuarioSerializer
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .forms import (
-    UsuarioForm, SalaForm, DigitalForm,
-    UsuarioCadastroForm, DigitalFormSet
+from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
+
+from .models import (
+    Usuario, Digital, HistoricoAcesso, TipoAcesso, UsuarioSala, Sala
 )
-from .models import Usuario, Sala, Digital, HistoricoAcesso, TipoAcesso, UsuarioSala, CapturedTemplate
-
-
-# ===============================
-# Cadastrar usuário e digital
-# ===============================
-@api_view(['POST'])
-def register_user(request):
-    """
-    Espera JSON:
-    {
-        "nome": "Gabriel Pican",
-        "codigo": "A12345",
-        "tipo_usuario": "aluno",
-        "template_b64": "<string base64>",
-        "dedo": 1
-    }
-    """
-    data = request.data
-    nome = data.get('nome')
-    codigo = data.get('codigo')
-    tipo_usuario = data.get('tipo_usuario', 'aluno')
-    template_b64 = data.get('template_b64')
-    dedo = data.get('dedo')
-
-    if not nome or not codigo or not template_b64:
-        return Response({'error': 'Campos obrigatórios ausentes'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Cria ou obtém usuário
-    usuario, created = Usuario.objects.get_or_create(
-        codigo=codigo,
-        defaults={'nome': nome, 'tipo_usuario': tipo_usuario}
-    )
-
-    # Cria a digital associada
-    hash_sha256 = hashlib.sha256(template_b64.encode('utf-8')).hexdigest()
-    if Digital.objects.filter(hash_sha256=hash_sha256, usuario=usuario).exists():
-        return Response({'error': 'Template já cadastrado para este usuário'}, status=status.HTTP_409_CONFLICT)
-
-    digital = Digital.objects.create(
-        usuario=usuario,
-        template_b64=template_b64,
-        dedo=dedo
-    )
-
-    return Response({
-        'message': 'Usuário e digital cadastrados com sucesso!',
-        'usuario': UsuarioSerializer(usuario).data,
-        'digital_id': digital.id
-    }, status=status.HTTP_201_CREATED)
-
+from .forms import (
+    UsuarioCadastroForm # Vamos manter este, mas simplificado
+)
 
 # ===============================
-# Verificar digital enviada pelo Arduino
+# Helper: Função para falar com o Bridge
 # ===============================
-@api_view(['POST'])
-def verify_template(request):
+
+def send_bridge_command(command: str):
     """
-    Espera JSON:
-    { "template_b64": "<string base64>" }
+    Envia um comando (ex: "ENROLL:5") para a API do serial_bridge.py
     """
-    data = request.data
-    template_b64 = data.get('template_b64')
-
-    if not template_b64:
-        return Response({'error': 'Campo template_b64 obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
-
-    hash_sha256 = hashlib.sha256(template_b64.encode('utf-8')).hexdigest()
-
-    match = Digital.objects.filter(hash_sha256=hash_sha256, ativo=True).select_related('usuario').first()
-
-    if match:
-        # Determina contexto: entrada/saida da sessão (fallback para entrada)
-        tipo = request.session.get('tipo_acesso') or TipoAcesso.ENTRADA
-        if tipo not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
-            tipo = TipoAcesso.ENTRADA
-        HistoricoAcesso.objects.create(
-            usuario=match.usuario,
-            tipo_acesso=tipo,
-            motivo='Autenticacao bem-sucedida'
+    bridge_url = os.getenv('BRIDGE_API_URL')
+    if not bridge_url:
+        print("ERRO: BRIDGE_API_URL não está definida no .env")
+        return False, "Bridge API URL não configurada"
+        
+    try:
+        response = requests.post(
+            bridge_url,
+            json={'command': command},
+            timeout=5 # Timeout de 5 segundos
         )
-        return Response({
-            'match': True,
-            'usuario': match.usuario.nome,
-            'codigo': match.usuario.codigo
-        }, status=status.HTTP_200_OK)
-
-    # Caso não haja correspondência
-    tipo_fail = request.session.get('tipo_acesso') or TipoAcesso.ENTRADA
-    if tipo_fail not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
-        tipo_fail = TipoAcesso.ENTRADA
-    HistoricoAcesso.objects.create(
-        tipo_acesso=tipo_fail,
-        motivo='Falha de autenticacao',
-        metadata={'hash': hash_sha256}
-    )
-
-    return Response({'match': False}, status=status.HTTP_401_UNAUTHORIZED)
-
+        response.raise_for_status() # Lança erro se for 4xx/5xx
+        return True, response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"ERRO ao conectar com o bridge: {e}")
+        return False, str(e)
 
 # ===============================
-# Remover usuário e digitais
+# API: Bridge -> Django (Log de Acesso)
 # ===============================
 @api_view(['POST'])
-def remove_user(request):
+def log_access(request):
     """
-    Espera JSON: { "codigo": "A12345" }
+    Recebe um SENSOR_ID do bridge, valida e registra o acesso.
+    JSON esperado: { "sensor_id": 5, "confidence": 95 }
     """
-    codigo = request.data.get('codigo')
-    if not codigo:
-        return Response({'error': 'Campo codigo obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
+    sensor_id = request.data.get('sensor_id')
+    confidence = request.data.get('confidence')
+    
+    if not sensor_id:
+        return Response({'error': 'sensor_id obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
 
-    usuario = Usuario.objects.filter(codigo=codigo).first()
-    if not usuario:
-        return Response({'error': 'Usuário não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    digital = Digital.objects.filter(sensor_id=sensor_id, ativo=True).select_related('usuario').first()
 
-    usuario.delete()
-    return Response({'message': f'Usuário {codigo} removido com sucesso!'}, status=status.HTTP_200_OK)
+    if not digital:
+        # Digital não encontrada ou inativa
+        HistoricoAcesso.objects.create(
+            tipo_acesso=TipoAcesso.ENTRADA, # Fallback
+            motivo=f"Falha de autenticacao: sensor_id {sensor_id} desconhecido.",
+            metadata={'sensor_id': sensor_id, 'confidence': confidence}
+        )
+        return Response({'error': 'Digital não cadastrada'}, status=status.HTTP_404_NOT_FOUND)
+
+    # --- Match Encontrado ---
+    usuario = digital.usuario
+    
+    # Determina contexto (entrada/saida)
+    tipo = request.session.get('tipo_acesso') or TipoAcesso.ENTRADA
+    if tipo not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
+        tipo = TipoAcesso.ENTRADA
+
+    # *** LÓGICA DE PERMISSÃO ***
+    # TODO: Implementar lógica de qual sala o sensor está (por enquanto, log genérico)
+    # Por agora, apenas registramos que o *usuário* foi visto.
+    
+    HistoricoAcesso.objects.create(
+        usuario=usuario,
+        tipo_acesso=tipo,
+        motivo=f"Acesso por {digital.get_dedo_display()}",
+        metadata={'sensor_id': sensor_id, 'confidence': confidence}
+    )
+    
+    return Response({
+        'match': True,
+        'usuario': usuario.nome,
+        'codigo': usuario.codigo
+    }, status=status.HTTP_200_OK)
 
 
 # ===============================
-# Listar usuários
+# API: Admin -> Bridge (Comandos)
 # ===============================
-@api_view(['GET'])
-def list_users(request):
-    usuarios = Usuario.objects.all().order_by('id')
-    serializer = UsuarioSerializer(usuarios, many=True)
-    return Response(serializer.data)
 
+@staff_member_required # Garante que só o admin chame
+@api_view(['POST'])
+def sensor_enroll_command(request):
+    """
+    API interna para o Admin enviar um comando de CADASTRO.
+    JSON esperado: { "sensor_id": 5 }
+    """
+    sensor_id = request.data.get('sensor_id')
+    if not sensor_id:
+        return Response({'error': 'sensor_id obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    ok, response_data = send_bridge_command(f"ENROLL:{sensor_id}")
+    
+    if ok:
+        return Response({'status': 'Comando ENROLL enviado', 'bridge_response': response_data})
+    else:
+        return Response({'error': f'Falha ao enviar comando: {response_data}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@staff_member_required
+@api_view(['POST'])
+def sensor_delete_command(request):
+    """
+    API interna para o Admin enviar um comando de DELETE.
+    JSON esperado: { "sensor_id": 5 }
+    """
+    sensor_id = request.data.get('sensor_id')
+    if not sensor_id:
+        return Response({'error': 'sensor_id obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
+
+    ok, response_data = send_bridge_command(f"DELETE:{sensor_id}")
+    
+    if ok:
+        return Response({'status': 'Comando DELETE enviado', 'bridge_response': response_data})
+    else:
+        return Response({'error': f'Falha ao enviar comando: {response_data}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ===============================
+# Views de UI (Páginas)
+# ===============================
 
 def dashboard(request):
-    # Página inicial: pronta para ler digitais continuamente
-    # Mostra contexto (entrada/saída) e histórico recente
+    """
+    Dashboard principal. Removemos a "Consulta Manual" que é obsoleta.
+    """
     ctx = request.session.get('tipo_acesso') or TipoAcesso.ENTRADA
     if ctx not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
         ctx = TipoAcesso.ENTRADA
     recentes = HistoricoAcesso.objects.select_related('usuario', 'sala').order_by('-data_hora')[:10]
     return render(request, 'dashboard.html', {
-        'ready_message': 'Aproxime o dedo do sensor. O sistema está pronto para leitura.',
         'current_context': ctx,
         'recent_history': recentes,
     })
 
-
-def register_fingerprint_page(request):
-    """Fluxo único: cria usuário, associa salas e cadastra múltiplas digitais."""
-    if request.method == 'POST':
-        uform = UsuarioCadastroForm(request.POST, prefix='u')
-        dformset = DigitalFormSet(request.POST, prefix='d')
-        if uform.is_valid() and dformset.is_valid():
-            usuario = uform.save()
-            salas = uform.cleaned_data.get('salas')
-            if salas:
-                UsuarioSala.objects.bulk_create([
-                    UsuarioSala(usuario=usuario, sala=s)
-                    for s in salas
-                ], ignore_conflicts=True)
-
-            created = 0
-            for form in dformset:
-                dedo = form.cleaned_data.get('dedo')
-                template = form.cleaned_data.get('template_b64')
-                if not dedo or not template:
-                    continue
-                # Avoid duplicates for same user/template
-                h = hashlib.sha256(template.encode('utf-8')).hexdigest()
-                if not Digital.objects.filter(usuario=usuario, hash_sha256=h).exists():
-                    Digital.objects.create(usuario=usuario, dedo=dedo, template_b64=template)
-                    created += 1
-
-            messages.success(request, f'Usuário cadastrado com {created} digitais.')
-            return redirect('dashboard')
-        else:
-            messages.error(request, 'Verifique os dados do formulário.')
-    else:
-        uform = UsuarioCadastroForm(prefix='u')
-        dformset = DigitalFormSet(prefix='d')
-
-    return render(request, 'register_fingerprint.html', {
-        'uform': uform,
-        'dformset': dformset,
-    })
-
-
-def login_view(request):
-    # If you later wire a form handler, change method handling here
-    return render(request, 'login.html')
-
-# ===============================
-# Fluxo operador: registrar entrada/saída (opcional)
-# ===============================
 def set_access_context(request):
-    """Define se o próximo match conta como ENTRADA ou SAÍDA (exibição ao operador)."""
+    """Define se o próximo match conta como ENTRADA ou SAÍDA."""
     tipo = request.GET.get('tipo') or request.POST.get('tipo')
     if tipo in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
         request.session['tipo_acesso'] = tipo
@@ -210,101 +159,18 @@ def set_access_context(request):
     return redirect('dashboard')
 
 
-# ===============================
-# Captura: submit + latest (auxiliar para autocompletar template)
-# ===============================
-@api_view(['POST'])
-def capture_submit(request):
-    template_b64 = request.data.get('template_b64')
-    if not template_b64:
-        return Response({'error': 'template_b64 requerido'}, status=status.HTTP_400_BAD_REQUEST)
-    CapturedTemplate.objects.create(template_b64=template_b64)
-    return Response({'ok': True})
-
-
-@api_view(['GET'])
-def capture_latest(request):
-    obj = CapturedTemplate.objects.order_by('-criado_em').first()
-    if not obj:
-        return Response({'template_b64': None})
-    return Response({'template_b64': obj.template_b64, 'criado_em': obj.criado_em})
-
+def login_view(request):
+    return render(request, 'login.html')
 
 # ===============================
-# Consulta operador (não grava histórico) + confirmação
+# PÁGINAS E VIEWS OBSOLETAS
 # ===============================
-@api_view(['POST'])
-def consult_fingerprint(request):
-    """Consulta uma digital capturada (template base64) e retorna o usuário e salas vinculadas.
-
-    Entrada JSON: { "template_b64": "..." }
-    Saída se match:
-    {
-        "match": true,
-        "usuario": {"id": 1, "nome": "...", "codigo": "...", "tipo_usuario": "aluno"},
-        "salas": [ {"id": 3, "nome": "LAB"}, ... ]
-    }
-    Caso não encontre: { "match": false }
-    """
-    template_b64 = request.data.get('template_b64')
-    if not template_b64:
-        return Response({'error': 'template_b64 requerido'}, status=status.HTTP_400_BAD_REQUEST)
-    h = hashlib.sha256(template_b64.encode('utf-8')).hexdigest()
-    digital = Digital.objects.filter(hash_sha256=h, ativo=True).select_related('usuario').first()
-    if not digital:
-        return Response({'match': False}, status=status.HTTP_404_NOT_FOUND)
-    usuario = digital.usuario
-    salas_rel = UsuarioSala.objects.filter(usuario=usuario).select_related('sala')
-    salas = [
-        {'id': rel.sala.id, 'nome': rel.sala.nome}
-        for rel in salas_rel
-    ]
-    return Response({
-        'match': True,
-        'usuario': {
-            'id': usuario.id,
-            'nome': usuario.nome,
-            'codigo': usuario.codigo,
-            'tipo_usuario': usuario.tipo_usuario,
-        },
-        'salas': salas
-    }, status=status.HTTP_200_OK)
-
-
-@api_view(['POST'])
-def confirm_access(request):
-    """Confirma o acesso de um usuário a uma sala, gravando no histórico.
-
-    Entrada JSON: { "usuario_id": 1, "sala_id": 5 }
-    Usa o contexto de acesso armazenado em sessão (entrada/saida) ou fallback para ENTRADA.
-    Retorna histórico criado.
-    """
-    usuario_id = request.data.get('usuario_id')
-    sala_id = request.data.get('sala_id')
-    if not usuario_id or not sala_id:
-        return Response({'error': 'usuario_id e sala_id requeridos'}, status=status.HTTP_400_BAD_REQUEST)
-    usuario = Usuario.objects.filter(id=usuario_id).first()
-    sala = Sala.objects.filter(id=sala_id).first()
-    if not usuario or not sala:
-        return Response({'error': 'Usuário ou sala inválidos'}, status=status.HTTP_404_NOT_FOUND)
-    if not UsuarioSala.objects.filter(usuario=usuario, sala=sala).exists():
-        return Response({'error': 'Usuário não possui acesso a esta sala'}, status=status.HTTP_403_FORBIDDEN)
-    tipo = request.session.get('tipo_acesso')
-    if tipo not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
-        tipo = TipoAcesso.ENTRADA
-    hist = HistoricoAcesso.objects.create(
-        usuario=usuario,
-        sala=sala,
-        tipo_acesso=tipo,
-        motivo='Acesso confirmado via painel'
-    )
-    return Response({
-        'ok': True,
-        'historico': {
-            'id': hist.id,
-            'usuario_nome': usuario.nome,
-            'sala_nome': sala.nome,
-            'tipo_acesso': hist.tipo_acesso,
-            'data_hora': hist.data_hora,
-        }
-    }, status=status.HTTP_201_CREATED)
+# register_user -> Removido (agora é 'log_access')
+# verify_template -> Removido (agora é 'log_access')
+# remove_user -> Removido (será feito pelo Admin)
+# list_users -> Removido (será feito pelo Admin)
+# register_fingerprint_page -> Removido (Admin faz isso)
+# capture_submit -> Removido (não precisamos mais)
+# capture_latest -> Removido (não precisamos mais)
+# consult_fingerprint -> Removido (não precisamos mais)
+# confirm_access -> Removido (não precisamos mais)

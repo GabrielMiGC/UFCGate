@@ -34,12 +34,21 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-lr$5jxcvs+jbj0hpd#c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(int(os.getenv('DJANGO_DEBUG', '1')))
 
-ALLOWED_HOSTS = []
+# Hosts/CSRF configured via environment for portability across machines
+_allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS')
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+else:
+    # permissive default in dev; set DJANGO_ALLOWED_HOSTS in production
+    ALLOWED_HOSTS = ['*']
+
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -47,7 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'biometria',
+    'biometria'
 ]
 
 MIDDLEWARE = [
@@ -165,8 +174,40 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- Configurações do Tema Jazzmin ---
+JAZZMIN_SETTINGS = {
+    # Título da janela (e login)
+    "site_title": "UFCGate Admin",
+
+    # Título no cabeçalho
+    "site_header": "UFCGate",
+
+    # Logo no login
+    "login_logo_dark": None, 
+
+    # Ver site no cabeçalho
+    "site_url": "/",  # Cria um link para o Dashboard no topo do menu admin
+
+    # Título na barra lateral
+    "site_brand": "UFCGate",
+
+    # UI Tweaks
+    "show_ui_builder": False, # Esconde o customizador de UI
+    "changeform_format": "horizontal_tabs",
+    "related_modal_active": True
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": True,
+    "theme": "default", # Você pode testar outros, ex: "darkly", "flatly"
+    "navbar": "navbar-dark",
+    "sidebar": "sidebar-dark-primary",
+}

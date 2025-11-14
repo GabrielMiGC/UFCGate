@@ -4,17 +4,24 @@
 
 {% block content %}
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-    <!-- Sidebar -->
-    <aside class="md:col-span-1 bg-white p-6 rounded-xl shadow border">
+    
+    <aside class="md:col-span-1 bg-white p-6 rounded-xl shadow border self-start">
         <h2 class="text-xl font-bold mb-4">Operações</h2>
         <div class="space-y-3">
-            <a href="{% url 'register_fingerprint' %}" class="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded">Cadastrar Usuário/Sala</a>
-            <div class="space-x-2">
-                <a href="{% url 'set_access_context' %}?tipo=entrada" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded">Marcar Entrada</a>
-                <a href="{% url 'set_access_context' %}?tipo=saida" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded">Marcar Saída</a>
+            <a href="{% url 'admin:index' %}" class="block w-full text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 shadow-md">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+            Gestão (Admin)
+        </a>
+            <div class="space-y-2 pt-2">
+                <p class="text-sm font-medium text-gray-600">Definir Contexto:</p>
+                <a href="{% url 'set_access_context' %}?tipo=entrada" class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded transition-all">Marcar Entrada</a>
+                <a href="{% url 'set_access_context' %}?tipo=saida" class="block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded transition-all">Marcar Saída</a>
             </div>
-            <!-- Indicador de conexão com Arduino -->
-            <div id="arduino-status" class="mt-6 p-3 border rounded-lg flex items-center gap-3 bg-gray-50">
+            
+            <div id="arduino-status" class="mt-6 pt-4 border-t flex items-center gap-3">
                 <span id="arduino-status-dot" class="inline-block w-3 h-3 rounded-full bg-gray-400 animate-pulse" aria-hidden="true"></span>
                 <div class="flex-1">
                     <p class="text-sm font-medium text-gray-700">Arduino</p>
@@ -24,84 +31,86 @@
         </div>
     </aside>
 
-    <!-- Main panel -->
-    <section class="md:col-span-3 bg-white p-8 rounded-xl shadow border">
-        <div class="text-center">
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">Sistema de Acesso Biométrico</h1>
-            <p class="text-gray-600 text-lg">{{ ready_message|default:'Aproxime o dedo do sensor. O sistema está pronto para leitura.' }}</p>
-            <div class="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded bg-blue-50 border border-blue-200 text-blue-800">
-                Contexto atual: <strong>{{ current_context|title }}</strong>
+    <section class="md:col-span-3 space-y-6">
+
+        <div class="bg-white p-8 rounded-xl shadow border text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Sistema de Acesso Biométrico</h1>
+            <p class="text-gray-600 text-lg mb-4">{{ ready_message|default:'Aproxime o dedo do sensor. O sistema está pronto para leitura.' }}</p>
+            
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 font-medium">
+                Contexto atual: <strong class="capitalize">{{ current_context|default:'-'|title }}</strong>
             </div>
 
-            <!-- Operação manual de consulta -->
-            <div class="mt-8 space-y-4">
-                <h2 class="text-xl font-semibold text-gray-700">Consulta Manual</h2>
-                <p class="text-gray-500 text-sm max-w-xl mx-auto">Use este fluxo quando o usuário apresenta o dedo. Primeiro capture o template recente, depois consulte para confirmar a identidade e selecione a sala de acesso.</p>
-                <div class="flex flex-wrap gap-3 justify-center">
-                    <button id="btn-captura" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded disabled:opacity-50">Pegar última captura</button>
-                    <button id="btn-consultar" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded disabled:opacity-50" disabled>Consultar usuário</button>
-                </div>
-                <div id="status-captura" class="text-sm text-gray-500 h-5"></div>
-                <textarea id="finger-template" class="hidden" aria-hidden="true"></textarea>
+            <svg class="w-24 h-24 text-blue-500 mx-auto mt-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.588 8.26l-3.878-3.878A4.5 4.5 0 0014.25 10.5a4.5 4.5 0 00-4.242-4.242L7.864 4.243zM4.5 10.5a7.5 7.5 0 1015 0c0-2.92-.556-5.709-1.588-8.26L4.243 15.636A7.465 7.465 0 004.5 10.5z" />
+            </svg>
+            
+            <div class="mt-6 flex items-center justify-center gap-3">
+                <button id="btn-captura" type="button" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold">Capturar Digital</button>
+                <button id="btn-consultar" type="button" class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-semibold disabled:opacity-50" disabled>Consultar Usuário</button>
             </div>
+            <p id="status-captura" class="text-sm h-5 text-gray-600 mt-2"></p>
+            <input type="hidden" id="finger-template" />
 
-            <div class="mt-8">
-                <svg class="w-28 h-28 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.588 8.26l-3.878-3.878A4.5 4.5 0 0014.25 10.5a4.5 4.5 0 00-4.242-4.242L7.864 4.243zM4.5 10.5a7.5 7.5 0 1015 0c0-2.92-.556-5.709-1.588-8.26L4.243 15.636A7.465 7.465 0 004.5 10.5z" />
-                </svg>
-                <p class="mt-4 text-gray-500">O leitor está em operação contínua. Ao detectar uma digital, o sistema irá verificar a base de dados.</p>
-            </div>
-
-            <div class="mt-10 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                <p class="text-yellow-800">Enquanto o banco é consultado, o usuário verá o status no LCD. O operador (você) acompanha mensagens similares nesta tela.</p>
-            </div>
+            <p class="mt-4 text-gray-500 text-sm max-w-lg mx-auto">O leitor está em operação contínua. Ao detectar uma digital, o sistema irá verificar a base de dados e registrar o acesso conforme o contexto (Entrada/Saída).</p>
         </div>
 
-        <div class="mt-10">
-            <h2 class="text-xl font-semibold mb-3">Histórico recente</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead>
+        
+        <div class="bg-white p-8 rounded-xl shadow border">
+            <h2 class="text-2xl font-semibold mb-4">Histórico Recente</h2>
+            <div class="overflow-x-auto border rounded-lg">
+                <table class="min-w-full text-sm divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
                         <tr class="text-left text-gray-600">
-                            <th class="py-2 pr-4">Data/Hora</th>
-                            <th class="py-2 pr-4">Usuário</th>
-                            <th class="py-2 pr-4">Sala</th>
-                            <th class="py-2 pr-4">Acesso</th>
-                            <th class="py-2 pr-4">Motivo</th>
+                            <th class="py-3 px-4 font-semibold">Data/Hora</th>
+                            <th class="py-3 px-4 font-semibold">Usuário</th>
+                            <th class="py-3 px-4 font-semibold">Sala</th>
+                            <th class="py-3 px-4 font-semibold">Acesso</th>
+                            <th class="py-3 px-4 font-semibold">Motivo</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-gray-200">
                         {% for h in recent_history %}
-                        <tr class="border-t">
-                            <td class="py-2 pr-4">{{ h.data_hora|date:"d/m H:i" }}</td>
-                            <td class="py-2 pr-4">{{ h.usuario.nome|default:'-' }}</td>
-                            <td class="py-2 pr-4">{{ h.sala.nome|default:'-' }}</td>
-                            <td class="py-2 pr-4">{{ h.tipo_acesso|title }}</td>
-                            <td class="py-2 pr-4">{{ h.motivo|default:'-' }}</td>
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-3 px-4 whitespace-nowrap">{{ h.data_hora|date:"d/m H:i" }}</td>
+                            <td class="py-3 px-4 whitespace-nowrap">{{ h.usuario.nome|default:'-' }}</td>
+                            <td class="py-3 px-4 whitespace-nowrap">{{ h.sala.nome|default:'-' }}</td>
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                {% if h.tipo_acesso == 'entrada' %}
+                                    <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Entrada</span>
+                                {% else %}
+                                    <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">Saída</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-gray-600">{{ h.motivo|default:'-' }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td class="py-3 text-gray-500" colspan="5">Sem registros ainda.</td></tr>
+                        <tr>
+                            <td class="py-4 px-4 text-center text-gray-500" colspan="5">
+                                Sem registros de acesso ainda.
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+
     </section>
 </div>
 
-<!-- Modal Consulta -->
-<div id="modal-consulta" class="hidden fixed inset-0 z-50 items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" data-modal-close></div>
-        <div class="relative bg-white w-full max-w-md mx-auto p-6 rounded-lg shadow-lg border animate-[fadeIn_.2s_ease-out]">
-                <h3 class="text-lg font-semibold mb-1" id="modal-usuario-nome">Usuário</h3>
-                <p class="text-sm text-gray-600 mb-4" id="modal-usuario-codigo"></p>
-                <label class="block text-sm font-medium mb-1" for="modal-sala-select">Sala para registrar acesso</label>
-                <select id="modal-sala-select" class="w-full border rounded px-3 py-2 mb-5 focus:outline-none focus:ring" ></select>
-                <div class="flex justify-end gap-3">
-                        <button type="button" class="px-4 py-2 rounded border text-gray-700 hover:bg-gray-50" data-modal-close>Cancelar</button>
-                        <button type="button" id="modal-confirm" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold">Confirmar Acesso</button>
-                </div>
-        </div>
+<div id="modal-consulta" class="hidden fixed inset-0 z-50 items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modal-usuario-nome">
+    <div class="absolute inset-0 bg-black/40" data-modal-close></div>
+    <div class="relative bg-white w-full max-w-md mx-auto p-6 rounded-lg shadow-lg border animate-[fadeIn_.2s_ease-out]">
+            <h3 class="text-lg font-semibold mb-1" id="modal-usuario-nome">Usuário</h3>
+            <p class="text-sm text-gray-600 mb-4" id="modal-usuario-codigo"></p>
+            <label class="block text-sm font-medium mb-1" for="modal-sala-select">Sala para registrar acesso</label>
+            <select id="modal-sala-select" class="w-full border rounded px-3 py-2 mb-5 focus:outline-none focus:ring" ></select>
+            <div class="flex justify-end gap-3">
+                    <button type="button" class="px-4 py-2 rounded border text-gray-700 hover:bg-gray-50" data-modal-close>Cancelar</button>
+                    <button type="button" id="modal-confirm" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold">Confirmar Acesso</button>
+            </div>
+    </div>
 </div>
 
 <script>
@@ -127,6 +136,7 @@
     }
 
     function setStatus(msg, type='info') {
+        if (!statusCaptura) return;
         const colors = {
             info: 'text-gray-600',
             success: 'text-green-600',
@@ -228,8 +238,8 @@
             });
             if (!res.ok) throw new Error();
             const data = await res.json();
-            appendHistoricoLinha(data.historico);
-            closeModal();
+            // Recarrega a página para ver a linha nova no histórico e limpar o status
+            window.location.reload(); 
         } catch (e) {
             alert('Falha ao registrar acesso.');
         }
@@ -250,32 +260,14 @@
             p = p.trim();
             if (p.startsWith(name)) return p.substring(name.length, p.length);
         }
-        // fallback: tentar meta tag se configurada futuramente
         return '';
     }
-
-    function appendHistoricoLinha(h) {
-        if (!h) return;
-        const tbody = document.querySelector('table tbody');
-        if (!tbody) return;
-        const tr = document.createElement('tr');
-        tr.className = 'border-t bg-green-50 animate-[fadeIn_.4s_ease-in]';
-        const dataHora = new Date(h.data_hora);
-        const dhFmt = dataHora.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', '');
-        tr.innerHTML = `
-            <td class="py-2 pr-4">${dhFmt}</td>
-            <td class="py-2 pr-4">${escapeHtml(h.usuario_nome || '-')}</td>
-            <td class="py-2 pr-4">${escapeHtml(h.sala_nome || '-')}</td>
-            <td class="py-2 pr-4">${escapeHtml(h.tipo_acesso || '-')}</td>
-            <td class="py-2 pr-4">Acesso confirmado via painel</td>
-        `;
-        tbody.prepend(tr);
-    }
-
-    function escapeHtml(str) {
-        return String(str).replace(/[&<>"]+/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
-    }
+    
+    // Removida a função 'appendHistoricoLinha'
+    // O script agora recarrega a página no sucesso do modal,
+    // o que é mais simples e garante que a tabela esteja 100% sincronizada.
 })();
+
 // ================= Indicador de conexão Arduino =================
 (function(){
     const dot = document.getElementById('arduino-status-dot');
@@ -290,7 +282,7 @@
             const res = await fetch('/api/capture/latest/', {signal: ctrl.signal, cache:'no-store'});
             clearTimeout(to);
             if(res.ok){
-                ok = true; // resposta da API já indica backend acessível e, indiretamente, bridge em operação mínima
+                ok = true;
             }
         } catch(e){ ok = false; }
         if(ok !== lastOk){
