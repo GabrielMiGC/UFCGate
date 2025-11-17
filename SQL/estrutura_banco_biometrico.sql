@@ -1,6 +1,9 @@
+-- SCRIPT AJUSTADO: estrutura_banco_biometrico_enhanced.sql
+-- VERSÃO 3 (Híbrida: sensor_id + template_b64 para testes)
+
 CREATE SCHEMA IF NOT EXISTS sistema_biometrico;
 
--- Tipos enumerados
+-- Tipos enumerados (Sem mudanças)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_usuario_enum') THEN
@@ -17,7 +20,7 @@ BEGIN
   END IF;
 END$$;
 
--- Tabela de usuários
+-- Tabela de usuários (Sem mudanças)
 CREATE TABLE IF NOT EXISTS sistema_biometrico.usuarios (
     id SERIAL PRIMARY KEY,
     nome TEXT NOT NULL,
@@ -27,7 +30,7 @@ CREATE TABLE IF NOT EXISTS sistema_biometrico.usuarios (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_codigo ON sistema_biometrico.usuarios (codigo);
 
--- Tabela de salas
+-- Tabela de salas (Sem mudanças)
 CREATE TABLE IF NOT EXISTS sistema_biometrico.salas (
     id SERIAL PRIMARY KEY,
     nome TEXT NOT NULL,
@@ -36,7 +39,7 @@ CREATE TABLE IF NOT EXISTS sistema_biometrico.salas (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_nome ON sistema_biometrico.salas (nome);
 
--- Associação entre usuários e salas
+-- Associação entre usuários e salas (Sem mudanças)
 CREATE TABLE IF NOT EXISTS sistema_biometrico.usuarios_salas (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER NOT NULL REFERENCES sistema_biometrico.usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -46,30 +49,31 @@ CREATE TABLE IF NOT EXISTS sistema_biometrico.usuarios_salas (
 );
 
 -- ============================================================
--- Tabela de digitais
+-- Tabela de digitais (MODIFICADA)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS sistema_biometrico.digitais (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER NOT NULL REFERENCES sistema_biometrico.usuarios(id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     
-    -- ID (slot) onde o sensor armazenou este template
+    -- ID (slot) onde o sensor armazena (para o fluxo principal)
     sensor_id INTEGER NOT NULL UNIQUE, 
 
+    -- ADICIONADO DE VOLTA: Template para o teste do orientador
+    template_b64 TEXT NULL,
 
     dedo sistema_biometrico.tipo_dedo_enum,
     ativo BOOLEAN NOT NULL DEFAULT true,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    -- Garante que um usuário não cadastre o mesmo dedo duas vezes
     UNIQUE (usuario_id, dedo)
 );
 
--- Índice para busca rápida pelo ID do sensor 
+-- Índice para busca rápida pelo ID do sensor (que o Arduino envia)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_digitais_sensor_id ON sistema_biometrico.digitais (sensor_id);
 -- ============================================================
 
--- Histórico de acessos 
+-- Histórico de acessos (Sem mudanças)
 CREATE TABLE IF NOT EXISTS sistema_biometrico.historico_acessos (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER REFERENCES sistema_biometrico.usuarios(id) ON DELETE SET NULL ON UPDATE CASCADE,

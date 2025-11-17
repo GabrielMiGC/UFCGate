@@ -31,7 +31,7 @@ class Dedo(models.TextChoices):
 
 
 # ============================
-#  MODELOS PRINCIPAIS
+#  MODELOS PRINCIPAIS (Sem mudanças)
 # ============================
 
 class Usuario(models.Model):
@@ -70,7 +70,7 @@ class UsuarioSala(models.Model):
 
 
 # ============================
-#  TABELA DE DIGITAIS
+#  TABELA DE DIGITAIS (MODIFICADA)
 # ============================
 
 class Digital(models.Model):
@@ -82,6 +82,14 @@ class Digital(models.Model):
         help_text="ID (1-999) no qual o sensor irá armazenar este template."
     )
 
+    # --- CAMPO ADICIONADO DE VOLTA ---
+    # Template (em Base64) para testes de verificação 1:N no servidor
+    template_b64 = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="Template da digital em Base64, para testes de verificação 1:N no servidor."
+    )
+    # ----------------------------------
     
     dedo = models.CharField(
         max_length=20,
@@ -102,7 +110,7 @@ class Digital(models.Model):
 
 
 # ============================
-#  HISTÓRICO DE ACESSOS 
+#  HISTÓRICO DE ACESSOS (Sem mudanças)
 # ============================
 
 class HistoricoAcesso(models.Model):
