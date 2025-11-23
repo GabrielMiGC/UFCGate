@@ -1,0 +1,12 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        {# Botão Vermelho Perigoso #}
+        <a href="wipe_sensor/" class="btn btn-danger" style="background-color: #dc3545; color: white; font-weight: bold; margin-left: 10px;" onclick="return confirm('ATENÇÃO: Isso apagará TODAS as digitais da memória física do sensor (Hardware). O banco de dados não será alterado. Tem certeza?');">
+            ⚠️ LIMPAR MEMÓRIA DO SENSOR
+        </a>
+    </li>
+{% endblock %}

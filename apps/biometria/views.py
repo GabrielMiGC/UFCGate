@@ -7,6 +7,8 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.utils import timezone  # O timezone do Django (tem .now())
+from datetime import timedelta
 
 from .models import (
     Usuario, Digital, HistoricoAcesso, TipoAcesso, UsuarioSala, Sala
@@ -74,22 +76,84 @@ def log_access(request):
     if tipo not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
         tipo = TipoAcesso.ENTRADA
 
-    # *** LÓGICA DE PERMISSÃO ***
-    # TODO: Implementar lógica de qual sala o sensor está (por enquanto, log genérico)
-    # Por agora, apenas registramos que o *usuário* foi visto.
-    
-    HistoricoAcesso.objects.create(
-        usuario=usuario,
-        tipo_acesso=tipo,
-        motivo=f"Acesso por {digital.get_dedo_display()}",
-        metadata={'sensor_id': sensor_id, 'confidence': confidence}
-    )
+    access = HistoricoAcesso.objects.create(
+            usuario=usuario,
+            tipo_acesso=tipo,
+            motivo=f"Acesso autorizado pelo sensor (Aguardando sala)",
+            metadata={'sensor_id': sensor_id, 'confidence': confidence, 'status': 'pending_room'}
+        )
     
     return Response({
         'match': True,
         'usuario': usuario.nome,
         'codigo': usuario.codigo
     }, status=status.HTTP_200_OK)
+    
+# O Dashboard pergunta "Tem alguém esperando?"
+@api_view(['GET'])
+def check_pending_access(request):
+    """
+    Busca o acesso mais recente (nos últimos 30 segundos) que ainda não tem sala definida.
+    """
+    time_threshold = timezone.now() - timedelta(seconds=30)
+    
+    # Pega o último acesso válido, sem sala, criado recentemente
+    pending = HistoricoAcesso.objects.filter(
+        data_hora__gte=time_threshold,
+        sala__isnull=True,
+        usuario__isnull=False
+    ).order_by('-data_hora').first()
+
+    if not pending:
+        return Response({'pending': False})
+
+    # Busca as salas que este usuário tem permissão
+    usuario = pending.usuario
+    salas_permitidas = UsuarioSala.objects.filter(usuario=usuario).select_related('sala')
+    
+    salas_data = [{'id': us.sala.id, 'nome': us.sala.nome} for us in salas_permitidas]
+
+    return Response({
+        'pending': True,
+        'access_id': pending.id,
+        'usuario_nome': usuario.nome,
+        'usuario_codigo': usuario.codigo,
+        'usuario_tipo': usuario.get_tipo_usuario_display(),
+        'data_hora': pending.data_hora.strftime('%d/%m/%Y %H:%M:%S'),
+        'salas_permitidas': salas_data
+    })
+
+
+# O Porteiro confirma a sala
+@api_view(['POST'])
+def confirm_access_room(request):
+    """
+    Recebe o ID do histórico e o ID da sala escolhida pelo porteiro.
+    """
+    access_id = request.data.get('access_id')
+    sala_id = request.data.get('sala_id')
+    
+    if not access_id or not sala_id:
+        return Response({'error': 'Dados incompletos'}, status=400)
+        
+    try:
+        acesso = HistoricoAcesso.objects.get(id=access_id)
+        sala = Sala.objects.get(id=sala_id)
+        
+        # Atualiza o registro
+        acesso.sala = sala
+        acesso.motivo = f"Acesso confirmado para {sala.nome}"
+        
+        # Atualiza metadata removendo flag de pendente
+        meta = acesso.metadata or {}
+        meta['status'] = 'confirmed'
+        acesso.metadata = meta
+        
+        acesso.save()
+        
+        return Response({'status': 'ok'})
+    except (HistoricoAcesso.DoesNotExist, Sala.DoesNotExist):
+        return Response({'error': 'Registro não encontrado'}, status=404)
 
 
 # ===============================

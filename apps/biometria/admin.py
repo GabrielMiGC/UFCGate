@@ -3,6 +3,8 @@ import os
 from django.contrib import admin, messages
 from django.conf import settings
 from .models import Usuario, Sala, Digital, UsuarioSala, HistoricoAcesso
+from django.urls import path
+from django.shortcuts import redirect
 
 # Helper para chamar nossa própria API interna
 def send_admin_command(command_type: str, sensor_id: int):
@@ -82,7 +84,7 @@ class SalaAdmin(admin.ModelAdmin):
 @admin.register(Digital)
 class DigitalAdmin(admin.ModelAdmin):
     """
-    Este é o novo centro de gerenciamento de digitais.
+    Gerenciamento de digitais com comando global de limpeza.
     """
     list_display = ('sensor_id', 'usuario', 'get_dedo_display', 'ativo')
     search_fields = ('usuario__nome', 'usuario__codigo', 'sensor_id')
@@ -90,39 +92,59 @@ class DigitalAdmin(admin.ModelAdmin):
     autocomplete_fields = ('usuario',)
     actions = ['send_enroll_command', 'send_delete_command']
 
+    # Aponta para o template que criamos acima
+    change_list_template = "admin/biometria/digital/change_list.html"
+
     def get_dedo_display(self, obj):
         return obj.get_dedo_display()
     get_dedo_display.short_description = 'Dedo'
 
+    # --- Configuração da URL Personalizada do Botão ---
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [
+            path('wipe_sensor/', self.admin_site.admin_view(self.wipe_sensor_view), name='digital_wipe_sensor'),
+        ]
+        return my_urls + urls
+
+    def wipe_sensor_view(self, request):
+        """
+        Função executada ao clicar no botão 'LIMPAR MEMÓRIA DO SENSOR'.
+        """
+        from .views import send_bridge_command # Reutiliza nosso helper
+        
+        # Envia comando DELETE_ALL para o bridge
+        ok, response = send_bridge_command("DELETE_ALL")
+        
+        if ok:
+            self.message_user(request, "Comando DELETE_ALL enviado! O sensor está sendo limpo.", messages.WARNING)
+        else:
+            self.message_user(request, f"Falha ao enviar comando: {response}", messages.ERROR)
+            
+        # Redireciona de volta para a lista
+        return redirect('..')
+
+    # --- Ações Existentes ---
+
     @admin.action(description='1. [CADastrar] Enviar comando de cadastro ao sensor')
     def send_enroll_command(self, request, queryset):
-        """
-        Ação do Admin para enviar um comando ENROLL para o bridge.
-        """
         for digital in queryset:
-            # Em vez de chamar a helper 'send_admin_command' (que tem problemas de auth)
-            # Vamos chamar a view helper 'send_bridge_command' diretamente
             from .views import send_bridge_command
-            
             ok, response = send_bridge_command(f"ENROLL:{digital.sensor_id}")
             if ok:
-                self.message_user(request, f"Comando ENROLL para ID {digital.sensor_id} enviado ao bridge.", messages.SUCCESS)
+                self.message_user(request, f"Comando ENROLL para ID {digital.sensor_id} enviado.", messages.SUCCESS)
             else:
-                self.message_user(request, f"Falha ao enviar ENROLL para ID {digital.sensor_id}: {response}", messages.ERROR)
+                self.message_user(request, f"Erro no ID {digital.sensor_id}: {response}", messages.ERROR)
 
     @admin.action(description='2. [DELETar] Enviar comando de deleção ao sensor')
     def send_delete_command(self, request, queryset):
-        """
-        Ação do Admin para enviar um comando DELETE para o bridge.
-        """
         for digital in queryset:
-            from .views import send_bridge_command # Importa a helper da view
-            
+            from .views import send_bridge_command 
             ok, response = send_bridge_command(f"DELETE:{digital.sensor_id}")
             if ok:
-                self.message_user(request, f"Comando DELETE para ID {digital.sensor_id} enviado ao bridge.", messages.SUCCESS)
+                self.message_user(request, f"Comando DELETE para ID {digital.sensor_id} enviado.", messages.SUCCESS)
             else:
-                self.message_user(request, f"Falha ao enviar DELETE para ID {digital.sensor_id}: {response}", messages.ERROR)
+                self.message_user(request, f"Erro no ID {digital.sensor_id}: {response}", messages.ERROR)
 
 
 @admin.register(HistoricoAcesso)
