@@ -192,16 +192,27 @@ JAZZMIN_SETTINGS = {
     # Logo no login
     "login_logo_dark": None, 
 
-    # Ver site no cabeçalho
-    "site_url": "/",  # Cria um link para o Dashboard no topo do menu admin
-
     # Título na barra lateral
     "site_brand": "UFCGate",
+    
+    # Link padrão do "Ver Site"
+    "site_url": "/",
 
     # UI Tweaks
-    "show_ui_builder": False, # Esconde o customizador de UI
+    "show_ui_builder": False,
     "changeform_format": "horizontal_tabs",
-    "related_modal_active": True
+    "related_modal_active": True,
+
+    "topmenu_links": [
+        # Link direto para o Dashboard (usando o 'name' da URL)
+        {
+            "name": "Voltar ao Dashboard", 
+            "url": "dashboard", 
+            "permissions": ["auth.view_user"], # Todos logados veem
+            "icon": "fas fa-home", # Ícone de casa
+        },
+    ],
+    # -------------------------------------------
 }
 
 JAZZMIN_UI_TWEAKS = {
