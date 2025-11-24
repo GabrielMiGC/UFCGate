@@ -73,44 +73,42 @@ class UsuarioSala(models.Model):
 #  TABELA DE DIGITAIS (MODIFICADA)
 # ============================
 
+# ========== ALTERADO PARA SUPORTE À VERSÃO A ==========
 class Digital(models.Model):
-    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="digitais")
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     
-    # ID unico que o sensor usará para armazenar este template
-    sensor_id = models.IntegerField(
-        unique=True,
-        help_text="ID (1-999) no qual o sensor irá armazenar este template."
-    )
+    # Agora opcional
+    sensor_id = models.IntegerField(null=True, blank=True)
 
-    # --- CAMPO ADICIONADO DE VOLTA ---
-    # Template (em Base64) para testes de verificação 1:N no servidor
-    template_b64 = models.TextField(
-        blank=True, 
-        null=True,
-        help_text="Template da digital em Base64, para testes de verificação 1:N no servidor."
-    )
-    # ----------------------------------
-    
-    dedo = models.CharField(
-        max_length=20,
-        choices=Dedo.choices,
-        blank=False,
-        null=False,
-    )
+    # Template usado no fluxo 1:1
+    template_b64 = models.TextField(null=True, blank=True)
+
+    # Hash do template (opcional mas recomendado)
+    hash_sha256 = models.TextField(null=True, blank=True)
+
+    dedo = models.CharField(max_length=30, null=True, blank=True)
     ativo = models.BooleanField(default=True)
-    criado_em = models.DateTimeField(default=timezone.now)
+    criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # Garante que um usuário não cadastre o mesmo dedo duas vezes
-        unique_together = ('usuario', 'dedo')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sensor_id'],
+                name='unique_sensor_id_not_null',
+                condition=~models.Q(sensor_id=None)  # funciona como WHERE sensor_id IS NOT NULL
+            ),
+            models.UniqueConstraint(
+                fields=['usuario', 'dedo'],
+                name='unique_user_finger'
+            )
+        ]
 
     def __str__(self):
-        dedo_str = self.get_dedo_display() or "Digital"
-        return f"{dedo_str} de {self.usuario.nome} (ID Sensor: {self.sensor_id})"
+        return f"Digital de {self.usuario.nome} ({self.dedo})"
 
 
 # ============================
-#  HISTÓRICO DE ACESSOS (Sem mudanças)
+#  HISTÓRICO DE ACESSOS
 # ============================
 
 class HistoricoAcesso(models.Model):

@@ -28,14 +28,14 @@ class DigitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Digital
-        fields = ['id', 'usuario', 'template_b64', 'hash_sha256', 'dedo', 'ativo', 'criado_em']
+        fields = [
+            'id',
+            'usuario',
+            'template_b64',
+            'hash_sha256',
+            'sensor_id',
+            'dedo',
+            'ativo',
+            'criado_em'
+        ]
         read_only_fields = ['hash_sha256', 'criado_em']
-
-
-class HistoricoAcessoSerializer(serializers.ModelSerializer):
-    usuario = UsuarioSerializer(read_only=True)
-    sala = SalaSerializer(read_only=True)
-
-    class Meta:
-        model = HistoricoAcesso
-        fields = ['id', 'usuario', 'sala', 'data_hora', 'tipo_acesso', 'motivo', 'metadata']

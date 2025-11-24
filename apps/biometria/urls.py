@@ -6,4 +6,6 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('login/', views.login_view, name='login'),
     path('set_access_context/', views.set_access_context, name='set_access_context'),
+    path("digitais/registrar/", views.registrar_template),
+    path("digitais/listar/", views.listar_templates)
 ]

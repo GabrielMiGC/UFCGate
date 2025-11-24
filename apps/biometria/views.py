@@ -162,6 +162,47 @@ def set_access_context(request):
 def login_view(request):
     return render(request, 'login.html')
 
+
+@api_view(['POST'])
+def registrar_template(request):
+    """
+    Recebe o template enviado pelo bridge (versão 1:1)
+    """
+    usuario_id = request.data.get('usuario_id')
+    template_b64 = request.data.get('template_b64')
+    dedo = request.data.get('dedo')
+
+    if not usuario_id or not template_b64:
+        return Response({"erro": "Dados incompletos"}, status=400)
+
+    digital, _ = Digital.objects.update_or_create(
+        usuario_id=usuario_id,
+        dedo=dedo,
+        defaults={
+            'template_b64': template_b64,
+            'ativo': True,
+        }
+    )
+
+    return Response({"status": "ok", "digital_id": digital.id})
+
+@api_view(['GET'])
+def listar_templates(request):
+    digit = Digital.objects.filter(ativo=True)
+
+    lista = [
+        {
+            "id": d.id,
+            "usuario_id": d.usuario_id,
+            "template_b64": d.template_b64,
+            "dedo": d.dedo
+        }
+        for d in digit
+    ]
+
+    return Response(lista)
+
+
 # ===============================
 # PÁGINAS E VIEWS OBSOLETAS
 # ===============================

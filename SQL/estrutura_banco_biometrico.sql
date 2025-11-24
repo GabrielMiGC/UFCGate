@@ -57,10 +57,13 @@ CREATE TABLE IF NOT EXISTS sistema_biometrico.digitais (
         ON DELETE CASCADE ON UPDATE CASCADE,
     
     -- ID (slot) onde o sensor armazena (para o fluxo principal)
-    sensor_id INTEGER NOT NULL UNIQUE, 
+    sensor_id INTEGER, 
 
-    -- ADICIONADO DE VOLTA: Template para o teste do orientador
+    -- Template para o teste do orientador
     template_b64 TEXT NULL,
+
+    -- Template para armazenamento no banco
+    template_hex TEXT,
 
     dedo sistema_biometrico.tipo_dedo_enum,
     ativo BOOLEAN NOT NULL DEFAULT true,
