@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS sistema_biometrico.digitais (
         ON DELETE CASCADE ON UPDATE CASCADE,
     
     -- ID (slot) onde o sensor armazenou este template
+    -- DY-50: suporta IDs de 1 a 200 (200 templates máximo)
     sensor_id INTEGER NOT NULL UNIQUE, 
 
 

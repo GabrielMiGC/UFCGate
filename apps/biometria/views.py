@@ -71,15 +71,11 @@ def log_access(request):
     # --- Match Encontrado ---
     usuario = digital.usuario
     
-    # Determina contexto (entrada/saida)
-    tipo = request.session.get('tipo_acesso') or TipoAcesso.ENTRADA
-    if tipo not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
-        tipo = TipoAcesso.ENTRADA
-
+    # Cria registro pendente (tipo será definido na confirmação)
     access = HistoricoAcesso.objects.create(
             usuario=usuario,
-            tipo_acesso=tipo,
-            motivo=f"Acesso autorizado pelo sensor (Aguardando sala)",
+            tipo_acesso=TipoAcesso.ENTRADA,  # Valor temporário
+            motivo=f"Acesso biométrico validado - Aguardando confirmação de sala",
             metadata={'sensor_id': sensor_id, 'confidence': confidence, 'status': 'pending_room'}
         )
     
@@ -94,6 +90,7 @@ def log_access(request):
 def check_pending_access(request):
     """
     Busca o acesso mais recente (nos últimos 30 segundos) que ainda não tem sala definida.
+    Retorna também o contexto atual de Entrada/Saída da sessão.
     """
     time_threshold = timezone.now() - timedelta(seconds=30)
     
@@ -112,6 +109,9 @@ def check_pending_access(request):
     salas_permitidas = UsuarioSala.objects.filter(usuario=usuario).select_related('sala')
     
     salas_data = [{'id': us.sala.id, 'nome': us.sala.nome} for us in salas_permitidas]
+    
+    # Captura o contexto de acesso da sessão do porteiro
+    tipo_acesso = request.session.get('tipo_acesso', TipoAcesso.ENTRADA)
 
     return Response({
         'pending': True,
@@ -120,7 +120,8 @@ def check_pending_access(request):
         'usuario_codigo': usuario.codigo,
         'usuario_tipo': usuario.get_tipo_usuario_display(),
         'data_hora': pending.data_hora.strftime('%d/%m/%Y %H:%M:%S'),
-        'salas_permitidas': salas_data
+        'salas_permitidas': salas_data,
+        'tipo_acesso': tipo_acesso
     })
 
 
@@ -128,21 +129,27 @@ def check_pending_access(request):
 @api_view(['POST'])
 def confirm_access_room(request):
     """
-    Recebe o ID do histórico e o ID da sala escolhida pelo porteiro.
+    Recebe o ID do histórico, o ID da sala e o tipo de acesso escolhidos pelo porteiro.
     """
     access_id = request.data.get('access_id')
     sala_id = request.data.get('sala_id')
+    tipo_acesso = request.data.get('tipo_acesso')  # 'entrada' ou 'saida'
     
     if not access_id or not sala_id:
         return Response({'error': 'Dados incompletos'}, status=400)
+    
+    # Valida o tipo de acesso
+    if tipo_acesso not in [TipoAcesso.ENTRADA, TipoAcesso.SAIDA]:
+        tipo_acesso = TipoAcesso.ENTRADA
         
     try:
         acesso = HistoricoAcesso.objects.get(id=access_id)
         sala = Sala.objects.get(id=sala_id)
         
-        # Atualiza o registro
+        # Atualiza o registro com TODOS os dados corretos
         acesso.sala = sala
-        acesso.motivo = f"Acesso confirmado para {sala.nome}"
+        acesso.tipo_acesso = tipo_acesso  # Define o tipo correto agora
+        acesso.motivo = f"Acesso confirmado: {tipo_acesso.upper()} em {sala.nome}"
         
         # Atualiza metadata removendo flag de pendente
         meta = acesso.metadata or {}
@@ -202,9 +209,6 @@ def sensor_delete_command(request):
 # ===============================
 
 def dashboard(request):
-    """
-    Dashboard principal. Removemos a "Consulta Manual" que é obsoleta.
-    """
     ctx = request.session.get('tipo_acesso') or TipoAcesso.ENTRADA
     if ctx not in (TipoAcesso.ENTRADA, TipoAcesso.SAIDA):
         ctx = TipoAcesso.ENTRADA
@@ -225,16 +229,3 @@ def set_access_context(request):
 
 def login_view(request):
     return render(request, 'login.html')
-
-# ===============================
-# PÁGINAS E VIEWS OBSOLETAS
-# ===============================
-# register_user -> Removido (agora é 'log_access')
-# verify_template -> Removido (agora é 'log_access')
-# remove_user -> Removido (será feito pelo Admin)
-# list_users -> Removido (será feito pelo Admin)
-# register_fingerprint_page -> Removido (Admin faz isso)
-# capture_submit -> Removido (não precisamos mais)
-# capture_latest -> Removido (não precisamos mais)
-# consult_fingerprint -> Removido (não precisamos mais)
-# confirm_access -> Removido (não precisamos mais)

@@ -1,5 +1,6 @@
 import hashlib
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
 
@@ -79,7 +80,8 @@ class Digital(models.Model):
     # ID unico que o sensor usará para armazenar este template
     sensor_id = models.IntegerField(
         unique=True,
-        help_text="ID (1-999) no qual o sensor irá armazenar este template."
+        validators=[MinValueValidator(1), MaxValueValidator(200)],
+        help_text="ID (1-200) no qual o sensor irá armazenar este template."
     )
 
     

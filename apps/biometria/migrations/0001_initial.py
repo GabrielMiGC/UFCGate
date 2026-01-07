@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
             name='Digital',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('sensor_id', models.IntegerField(help_text='ID (1-999) no qual o sensor irá armazenar este template.', unique=True)),
+                ('sensor_id', models.IntegerField(help_text='ID (1-200) no qual o sensor irá armazenar este template.', unique=True)),
                 ('dedo', models.CharField(choices=[('indicador_dir', 'Indicador DIR.'), ('polegar_dir', 'Polegar DIR.'), ('medio_dir', 'Médio DIR.'), ('anelar_dir', 'Anelar DIR.'), ('minimo_dir', 'Mínimo DIR.'), ('indicador_esq', 'Indicador ESQ.'), ('polegar_esq', 'Polegar ESQ.'), ('medio_esq', 'Médio ESQ.'), ('anelar_esq', 'Anelar ESQ.'), ('minimo_esq', 'Mínimo ESQ.')], max_length=20)),
                 ('ativo', models.BooleanField(default=True)),
                 ('criado_em', models.DateTimeField(default=django.utils.timezone.now)),

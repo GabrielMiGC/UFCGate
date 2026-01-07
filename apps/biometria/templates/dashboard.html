@@ -175,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const elTime = document.getElementById('modal-timestamp');
     
     let currentAccessId = null;
+    let currentTipoAcesso = null;
     let isModalOpen = false;
     let pollingInterval = null;
 
@@ -183,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isModalOpen) return; // Já está aberto
         
         currentAccessId = data.access_id;
+        currentTipoAcesso = data.tipo_acesso || 'entrada';
         elName.textContent = data.usuario_nome;
         elCode.textContent = data.usuario_codigo + " (" + data.usuario_tipo + ")";
         elTime.textContent = data.data_hora;
@@ -218,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.classList.add('hidden');
         isModalOpen = false;
         currentAccessId = null;
+        currentTipoAcesso = null;
         roomError.classList.add('hidden');
     }
 
@@ -241,7 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     access_id: currentAccessId,
-                    sala_id: salaId
+                    sala_id: salaId,
+                    tipo_acesso: currentTipoAcesso
                 })
             });
             

@@ -59,26 +59,118 @@ class DigitalInline(admin.TabularInline):
 
 
 class UsuarioSalaInline(admin.TabularInline):
+    """
+    Inline para gerenciar associações entre Usuários e Salas.
+    Permite adicionar e remover salas sem excluir o usuário.
+    """
     model = UsuarioSala
     verbose_name = "Acesso à Sala"
+    verbose_name_plural = "Acessos às Salas"
     extra = 1
     autocomplete_fields = ['sala']
+    can_delete = True  # Permite remover associações individuais
+    
+    fields = ['sala', 'criado_em']
+    readonly_fields = ['criado_em']
+    
+    def has_add_permission(self, request, obj):
+        # Permite adicionar novas associações
+        return True
+    
+    def has_delete_permission(self, request, obj=None):
+        # Permite deletar associações sem deletar o usuário
+        return True
 
 
 # --- ModelAdmins Principais ---
 
 @admin.register(Usuario)
 class UsuarioAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'codigo', 'tipo_usuario']
+    list_display = ['nome', 'codigo', 'tipo_usuario', 'criado_em', 'total_salas', 'total_digitais']
     search_fields = ['nome', 'codigo']
-    list_filter = ['tipo_usuario']
-    inlines = [UsuarioSalaInline, DigitalInline] # Mostra os dois inlines
+    list_filter = ['tipo_usuario', 'criado_em']
+    inlines = [UsuarioSalaInline, DigitalInline]
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('nome', 'codigo', 'tipo_usuario')
+        }),
+        ('Metadados', {
+            'fields': ('criado_em',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ['criado_em']
+    
+    def total_salas(self, obj):
+        """Mostra quantas salas o usuário tem acesso"""
+        count = UsuarioSala.objects.filter(usuario=obj).count()
+        return f"{count} salas" if count > 0 else "Nenhuma"
+    total_salas.short_description = 'Salas Autorizadas'
+    
+    def total_digitais(self, obj):
+        """Mostra quantas digitais o usuário tem cadastradas"""
+        count = Digital.objects.filter(usuario=obj, ativo=True).count()
+        return f"{count} digitais" if count > 0 else "Nenhuma"
+    total_digitais.short_description = 'Digitais Ativas'
 
 
 @admin.register(Sala)
 class SalaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'descricao']
-    search_fields = ['nome']
+    list_display = ['nome', 'descricao', 'total_usuarios', 'criado_em']
+    search_fields = ['nome', 'descricao']
+    list_filter = ['criado_em']
+    
+    fieldsets = (
+        ('Informações da Sala', {
+            'fields': ('nome', 'descricao')
+        }),
+        ('Metadados', {
+            'fields': ('criado_em',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ['criado_em']
+    
+    def total_usuarios(self, obj):
+        """Mostra quantos usuários têm acesso a esta sala"""
+        count = UsuarioSala.objects.filter(sala=obj).count()
+        return f"{count} usuários" if count > 0 else "Nenhum"
+    total_usuarios.short_description = 'Usuários Autorizados'
+
+
+@admin.register(UsuarioSala)
+class UsuarioSalaAdmin(admin.ModelAdmin):
+    """
+    Admin separado para gerenciar associações usuário-sala diretamente.
+    Útil para visualização em massa e relatórios.
+    """
+    list_display = ['usuario', 'sala', 'criado_em']
+    list_filter = ['sala', 'usuario__tipo_usuario', 'criado_em']
+    search_fields = ['usuario__nome', 'usuario__codigo', 'sala__nome']
+    autocomplete_fields = ['usuario', 'sala']
+    date_hierarchy = 'criado_em'
+    
+    fieldsets = (
+        ('Associação', {
+            'fields': ('usuario', 'sala')
+        }),
+        ('Informações', {
+            'fields': ('criado_em',),
+        }),
+    )
+    
+    readonly_fields = ['criado_em']
+    
+    def has_add_permission(self, request):
+        # Permite adicionar associações
+        return True
+    
+    def has_delete_permission(self, request, obj=None):
+        # Permite remover associações
+        return True
 
 
 @admin.register(Digital)
@@ -126,7 +218,7 @@ class DigitalAdmin(admin.ModelAdmin):
 
     # --- Ações Existentes ---
 
-    @admin.action(description='1. [CADastrar] Enviar comando de cadastro ao sensor')
+    @admin.action(description='1. [Cadastrar] Enviar comando de cadastro ao sensor')
     def send_enroll_command(self, request, queryset):
         for digital in queryset:
             from .views import send_bridge_command
@@ -136,7 +228,7 @@ class DigitalAdmin(admin.ModelAdmin):
             else:
                 self.message_user(request, f"Erro no ID {digital.sensor_id}: {response}", messages.ERROR)
 
-    @admin.action(description='2. [DELETar] Enviar comando de deleção ao sensor')
+    @admin.action(description='2. [Deletar] Enviar comando de deleção ao sensor')
     def send_delete_command(self, request, queryset):
         for digital in queryset:
             from .views import send_bridge_command 
